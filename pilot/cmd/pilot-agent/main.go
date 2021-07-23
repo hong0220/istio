@@ -98,6 +98,8 @@ var (
 			if err != nil {
 				return err
 			}
+
+			// envoy的配置信息
 			proxyConfig, err := config.ConstructProxyConfig(meshConfigFile, serviceCluster, options.ProxyConfigEnv, concurrency, proxy)
 			if err != nil {
 				return fmt.Errorf("failed to get proxy config: %v", err)
@@ -178,6 +180,8 @@ var (
 				log.Error("Failed to extract node metadata: ", err)
 				os.Exit(1)
 			}
+
+			// 生成envoy
 			envoyProxy := envoy.NewProxy(envoy.ProxyConfig{
 				Node:              node,
 				LogLevel:          proxyLogLevel,
@@ -188,6 +192,8 @@ var (
 			})
 
 			drainDuration, _ := types.DurationFromProto(proxyConfig.TerminationDrainDuration)
+
+			// 生成agent
 			envoyAgent := envoy.NewAgent(envoyProxy, drainDuration)
 			// On SIGINT or SIGTERM, cancel the context, triggering a graceful shutdown
 			go cmd.WaitSignalFunc(cancel)
