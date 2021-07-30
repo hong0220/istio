@@ -99,7 +99,7 @@ var (
 				return err
 			}
 
-			// envoy的配置信息
+			// 设置envoy的默认配置参数信息
 			proxyConfig, err := config.ConstructProxyConfig(meshConfigFile, serviceCluster, options.ProxyConfigEnv, concurrency, proxy)
 			if err != nil {
 				return fmt.Errorf("failed to get proxy config: %v", err)
@@ -151,6 +151,7 @@ var (
 
 			// If a status port was provided, start handling status probes.
 			if proxyConfig.StatusPort > 0 {
+				// 启动 status server，进行健康检查
 				if err := initStatusServer(ctx, proxy, proxyConfig, agent); err != nil {
 					return err
 				}
@@ -181,7 +182,7 @@ var (
 				os.Exit(1)
 			}
 
-			// 生成envoy
+			// 生成proxy实例(envoy)，包括配置，启动参数等
 			envoyProxy := envoy.NewProxy(envoy.ProxyConfig{
 				Node:              node,
 				LogLevel:          proxyLogLevel,
@@ -193,11 +194,14 @@ var (
 
 			drainDuration, _ := types.DurationFromProto(proxyConfig.TerminationDrainDuration)
 
-			// 生成agent
+			// 生成agent实例，实现Agent接口
 			envoyAgent := envoy.NewAgent(envoyProxy, drainDuration)
+
+			// 开启线程监听信号，进行优雅退出
 			// On SIGINT or SIGTERM, cancel the context, triggering a graceful shutdown
 			go cmd.WaitSignalFunc(cancel)
 
+			// 启动agent
 			return envoyAgent.Run(ctx)
 		},
 	}
@@ -249,11 +253,15 @@ func initStatusServer(ctx context.Context, proxy *model.Proxy, proxyConfig *mesh
 	probes ...ready.Prober) error {
 	o := options.NewStatusServerOptions(proxy, proxyConfig, probes...)
 	o.Context = ctx
+
 	statusServer, err := status.NewServer(*o)
 	if err != nil {
 		return err
 	}
+
+	// 进行健康检查
 	go statusServer.Run(ctx)
+
 	return nil
 }
 

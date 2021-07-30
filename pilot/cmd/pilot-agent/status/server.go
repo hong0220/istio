@@ -149,6 +149,7 @@ func NewServer(config Options) (*Server, error) {
 	})
 	probes = append(probes, config.Probes...)
 	s := &Server{
+		// 通过参数 --statusPort 15020 设置
 		statusPort:            config.StatusPort,
 		ready:                 probes,
 		appProbersDestination: config.PodIP,
@@ -238,10 +239,12 @@ func (s *Server) Run(ctx context.Context) {
 
 	mux := http.NewServeMux()
 
+	// 通过调用handleReadyProbe处理器来调用Envoy的15000端口，判断Envoy是否已经ready接受相对应的流量
 	// Add the handler for ready probes.
 	mux.HandleFunc(readyPath, s.handleReadyProbe)
 	mux.HandleFunc(`/stats/prometheus`, s.handleStats)
 	mux.HandleFunc(quitPath, s.handleQuit)
+	// 应用端口检查
 	mux.HandleFunc("/app-health/", s.handleAppProbe)
 
 	// Add the handler for pprof.
@@ -251,6 +254,7 @@ func (s *Server) Run(ctx context.Context) {
 	mux.HandleFunc("/debug/pprof/symbol", s.handlePprofSymbol)
 	mux.HandleFunc("/debug/pprof/trace", s.handlePprofTrace)
 
+	// 端口通过参数 --statusPort 15020 设置
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", s.statusPort))
 	if err != nil {
 		log.Errorf("Error listening on status port: %v", err.Error())
@@ -266,6 +270,7 @@ func (s *Server) Run(ctx context.Context) {
 	}
 	defer l.Close()
 
+	// 开启监听
 	go func() {
 		if err := http.Serve(l, mux); err != nil {
 			log.Error(err)
