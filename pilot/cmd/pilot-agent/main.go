@@ -225,6 +225,7 @@ var (
 				tlsClientCertChain, tlsClientKey, tlsClientRootCert,
 			}
 
+			// 设置envoy的默认配置参数信息
 			proxyConfig := mesh.DefaultProxyConfig()
 
 			// set all flags
@@ -505,6 +506,7 @@ var (
 					localHostAddr = localHostIPv6
 				}
 				prober := kubeAppProberNameVar.Get()
+				// 启动 status server
 				statusServer, err := status.NewServer(status.Config{
 					LocalHostAddr:  localHostAddr,
 					AdminPort:      proxyAdminPort,
@@ -516,6 +518,8 @@ var (
 					cancel()
 					return err
 				}
+
+				// 进行健康检查
 				go waitForCompletion(ctx, statusServer.Run)
 			}
 
@@ -542,6 +546,7 @@ var (
 
 			log.Infof("PilotSAN %#v", pilotSAN)
 
+			// 生成proxy实例(envoy)，包括配置，启动参数等
 			envoyProxy := envoy.NewProxy(envoy.ProxyConfig{
 				Config:              proxyConfig,
 				Node:                role.ServiceNode(),
@@ -563,6 +568,7 @@ var (
 				PilotCertProvider:   pilotCertProvider,
 			})
 
+			// 生成agent实例，实现Agent接口
 			agent := envoy.NewAgent(envoyProxy, features.TerminationDrainDuration())
 
 			if nodeAgentSDSEnabled {
@@ -573,9 +579,11 @@ var (
 			watcher := envoy.NewWatcher(tlsCertsToWatch, agent.Restart)
 			go watcher.Run(ctx)
 
+			// 开启协程监听信号，进行优雅退出
 			// On SIGINT or SIGTERM, cancel the context, triggering a graceful shutdown
 			go cmd.WaitSignalFunc(cancel)
 
+			// 启动agent
 			return agent.Run(ctx)
 		},
 	}

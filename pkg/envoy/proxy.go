@@ -145,13 +145,16 @@ var istioBootstrapOverrideVar = env.RegisterStringVar("ISTIO_BOOTSTRAP_OVERRIDE"
 
 func (e *envoy) Run(config interface{}, epoch int, abort <-chan error) error {
 	var fname string
+
+	// 如果指定模板文件，则使用用户指定的
 	// Note: the cert checking still works, the generated file is updated if certs are changed.
 	// We just don't save the generated file, but use a custom one instead. Pilot will keep
 	// monitoring the certs and restart if the content of the certs changes.
 	if len(e.Config.CustomConfigFile) > 0 {
 		// there is a custom configuration. Don't write our own config - but keep watching the certs.
 		fname = e.Config.CustomConfigFile
-	} else {
+	} else { // 否则则使用默认的
+		// 调用CreateFileForEpoch方法获取到模板文件
 		out, err := bootstrap.New(bootstrap.Config{
 			Node:                e.Node,
 			DNSRefreshRate:      e.DNSRefreshRate,
@@ -178,10 +181,12 @@ func (e *envoy) Run(config interface{}, epoch int, abort <-chan error) error {
 		fname = out
 	}
 
+	// 设置启动参数args
 	// spin up a new Envoy process
 	args := e.args(fname, epoch, istioBootstrapOverrideVar.Get())
 	log.Infof("Envoy command: %v", args)
 
+	// 使用exec包调用envoy启动命令
 	/* #nosec */
 	cmd := exec.Command(e.Config.BinaryPath, args...)
 	cmd.Stdout = os.Stdout
@@ -189,12 +194,16 @@ func (e *envoy) Run(config interface{}, epoch int, abort <-chan error) error {
 	if err := cmd.Start(); err != nil {
 		return err
 	}
+
+	// 异步获取cmd的返回结果
 	done := make(chan error, 1)
 	go func() {
 		done <- cmd.Wait()
 	}()
 
+	// 等待 abort channel 和 done，用于结束Envoy和正确返回当前的启动状态
 	select {
+	// 用于优雅关闭
 	case err := <-abort:
 		log.Warnf("Aborting epoch %d", epoch)
 		if errKill := cmd.Process.Kill(); errKill != nil {

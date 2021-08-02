@@ -72,7 +72,8 @@ const errOutOfMemory = "signal: killed"
 // NewAgent creates a new proxy agent for the proxy start-up and clean-up functions.
 func NewAgent(proxy Proxy, terminationDrainDuration time.Duration) Agent {
 	return &agent{
-		proxy:                    proxy,
+		proxy: proxy,
+		// 用于管理启动Envoy后的状态通道，用于监视Envoy进程的状态
 		statusCh:                 make(chan exitStatus),
 		activeEpochs:             map[int]chan error{},
 		terminationDrainDuration: terminationDrainDuration,
@@ -211,6 +212,7 @@ func (a *agent) Run(ctx context.Context) error {
 	log.Info("Starting proxy agent")
 	for {
 		select {
+		// 监听statusCh管道中的数据
 		case status := <-a.statusCh:
 			a.mutex.Lock()
 			if status.err != nil {
@@ -219,6 +221,7 @@ func (a *agent) Run(ctx context.Context) error {
 				}
 				log.Errorf("Epoch %d exited with error: %v", status.epoch, status.err)
 			} else {
+				// 正常退出
 				log.Infof("Epoch %d exited normally", status.epoch)
 			}
 
@@ -249,6 +252,7 @@ func (a *agent) terminate() {
 		log.Warnf("Error in invoking drain listeners endpoint %v", e)
 	}
 	log.Infof("Graceful termination period is %v, starting...", a.terminationDrainDuration)
+	// 睡眠
 	time.Sleep(a.terminationDrainDuration)
 	log.Infof("Graceful termination period complete, terminating remaining proxies.")
 	a.abortAll()
@@ -257,8 +261,11 @@ func (a *agent) terminate() {
 // runWait runs the start-up command as a go routine and waits for it to finish
 func (a *agent) runWait(config interface{}, epoch int, abortCh <-chan error) {
 	log.Infof("Epoch %d starting", epoch)
+	// 启动Envoy
 	err := a.proxy.Run(config, epoch, abortCh)
+	// 删除当前 epoch 对应的配置文件
 	a.proxy.Cleanup(epoch)
+	// 返回的参数在runWait方法中会被接受到，存入到statusCh管道中
 	a.statusCh <- exitStatus{epoch: epoch, err: err}
 }
 

@@ -89,6 +89,7 @@ type Server struct {
 // NewServer creates a new status server.
 func NewServer(config Config) (*Server, error) {
 	s := &Server{
+		// 通过参数 --statusPort 15020 设置
 		statusPort: config.StatusPort,
 		ready: &ready.Probe{
 			LocalHostAddr: config.LocalHostAddr,
@@ -130,11 +131,14 @@ func (s *Server) Run(ctx context.Context) {
 
 	mux := http.NewServeMux()
 
+	// 通过调用handleReadyProbe处理器来调用Envoy的15000端口，判断Envoy是否已经ready接受相对应的流量
 	// Add the handler for ready probes.
 	mux.HandleFunc(readyPath, s.handleReadyProbe)
 	mux.HandleFunc(quitPath, s.handleQuit)
+	// 应用端口检查
 	mux.HandleFunc("/app-health/", s.handleAppProbe)
 
+	// 端口通过参数 --statusPort 15020 设置
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", s.statusPort))
 	if err != nil {
 		log.Errorf("Error listening on status port: %v", err.Error())
@@ -150,6 +154,7 @@ func (s *Server) Run(ctx context.Context) {
 	}
 	defer l.Close()
 
+	// 开启监听
 	go func() {
 		if err := http.Serve(l, mux); err != nil {
 			log.Errora(err)

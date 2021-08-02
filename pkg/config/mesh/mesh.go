@@ -34,6 +34,7 @@ import (
 
 // DefaultProxyConfig for individual proxies
 func DefaultProxyConfig() meshconfig.ProxyConfig {
+	// 配置参数
 	return meshconfig.ProxyConfig{
 		ConfigPath:             constants.ConfigPathDir,
 		BinaryPath:             constants.BinaryPathFilename,
