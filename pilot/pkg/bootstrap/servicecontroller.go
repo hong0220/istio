@@ -48,6 +48,7 @@ func (s *Server) initServiceControllers(args *PilotArgs) error {
 		log.Infof("Adding %s registry adapter", serviceRegistry)
 		switch serviceRegistry {
 		case serviceregistry.Kubernetes:
+			// k8s
 			if err := s.initKubeRegistry(serviceControllers, args); err != nil {
 				return err
 			}

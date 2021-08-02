@@ -204,15 +204,18 @@ func NewServer(args *PilotArgs) (*Server, error) {
 		return nil, fmt.Errorf("mesh: %v", err)
 	}
 	s.initMeshNetworks(args, fileWatcher)
+
 	// Certificate controller is created before MCP
 	// controller in case MCP server pod waits to mount a certificate
 	// to be provisioned by the certificate controller.
 	if err := s.initCertController(args); err != nil {
 		return nil, fmt.Errorf("certificate controller: %v", err)
 	}
+	// 初始化处理Istio Config的控制器
 	if err := s.initConfigController(args); err != nil {
 		return nil, fmt.Errorf("config controller: %v", err)
 	}
+	// 初始化处理Service Discovery的控制器
 	if err := s.initServiceControllers(args); err != nil {
 		return nil, fmt.Errorf("service controllers: %v", err)
 	}
@@ -256,6 +259,8 @@ func NewServer(args *PilotArgs) (*Server, error) {
 	if err := s.initDNSListener(args); err != nil {
 		return nil, fmt.Errorf("grpcDNS: %v", err)
 	}
+
+	// 初始化xDS服务端
 	if err := s.initDiscoveryService(args); err != nil {
 		return nil, fmt.Errorf("discovery service: %v", err)
 	}
@@ -266,11 +271,13 @@ func NewServer(args *PilotArgs) (*Server, error) {
 		return nil, fmt.Errorf("cluster registries: %v", err)
 	}
 
+	// Webhook 回调服务
 	// common https server for webhooks (e.g. injection, validation)
 	if err := s.initHTTPSWebhookServer(args); err != nil {
 		return nil, fmt.Errorf("injectionWebhook server: %v", err)
 	}
 
+	// sidecar注入相关
 	// Will run the sidecar injector in pilot.
 	// Only operates if /var/lib/istio/inject exists
 	if err := s.initSidecarInjector(args); err != nil {
@@ -787,6 +794,7 @@ func (s *Server) initEventHandlers() error {
 			ConfigTypesUpdated: map[resource.GroupVersionKind]struct{}{collections.IstioNetworkingV1Alpha3Serviceentries.Resource().GroupVersionKind(): {}},
 			Reason:             []model.TriggerReason{model.ServiceUpdate},
 		}
+		// 配置更新
 		s.EnvoyXdsServer.ConfigUpdate(pushReq)
 	}
 	if err := s.ServiceController().AppendServiceHandler(serviceHandler); err != nil {

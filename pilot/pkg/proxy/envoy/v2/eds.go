@@ -446,12 +446,15 @@ func (s *DiscoveryServer) edsUpdate(clusterID, serviceName string, namespace str
 		return
 	}
 
+	// 找到之前缓存的服务
 	// Update the data structures for the service.
 	// 1. Find the 'per service' data
 	if _, f := s.EndpointShardsByService[serviceName]; !f {
 		s.EndpointShardsByService[serviceName] = map[string]*EndpointShards{}
 	}
 	ep, f := s.EndpointShardsByService[serviceName][namespace]
+
+	// 不存在则初始化
 	if !f {
 		// This endpoint is for a service that was not previously loaded.
 		// Return an error to force a full sync, which will also cause the
@@ -498,6 +501,7 @@ func (s *DiscoveryServer) edsUpdate(clusterID, serviceName string, namespace str
 		if !requireFull {
 			edsUpdates = map[string]struct{}{serviceName: {}}
 		}
+		// 配置更新
 		s.ConfigUpdate(&model.PushRequest{
 			Full:               requireFull,
 			NamespacesUpdated:  map[string]struct{}{namespace: {}},

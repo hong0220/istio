@@ -43,6 +43,7 @@ func newEndpointsController(c *Controller, sharedInformers informers.SharedInfor
 			informer: informer,
 		},
 	}
+	// 注册处理器
 	out.registerEndpointsHandler()
 	return out
 }
@@ -225,6 +226,7 @@ func (e *endpointsController) onEvent(curr interface{}, event model.Event) error
 
 	return e.handleEvent(ep.Name, ep.Namespace, event, curr, func(obj interface{}, event model.Event) {
 		ep := obj.(*v1.Endpoints)
+		// EDS(Endpoint Discovery service)更新处理
 		e.c.updateEDS(ep, event)
 	})
 }

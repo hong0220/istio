@@ -189,10 +189,12 @@ func NewController(client kubernetes.Interface, options Options) *Controller {
 	log.Infof("Service controller watching namespace %q for services, endpoints, nodes and pods, refresh %s",
 		options.WatchedNamespace, options.ResyncPeriod)
 
+	// 初始化Controller
 	// The queue requires a time duration for a retry delay after a handler error
 	c := &Controller{
-		domainSuffix:               options.DomainSuffix,
-		client:                     client,
+		domainSuffix: options.DomainSuffix,
+		client:       client,
+		// 控制器任务队列
 		queue:                      queue.NewQueue(1 * time.Second),
 		clusterID:                  options.ClusterID,
 		xdsUpdater:                 options.XDSUpdater,
@@ -202,11 +204,16 @@ func NewController(client kubernetes.Interface, options Options) *Controller {
 		metrics:                    options.Metrics,
 	}
 
+	// 获取informer
 	sharedInformers := informers.NewSharedInformerFactoryWithOptions(client, options.ResyncPeriod, informers.WithNamespace(options.WatchedNamespace))
 
+	// 注册informer处理器
 	c.services = sharedInformers.Core().V1().Services().Informer()
+
+	// 注册Services Handler
 	registerHandlers(c.services, c.queue, "Services", c.onServiceEvent)
 
+	// 注册endpoints Handler
 	switch options.EndpointMode {
 	case EndpointsOnly:
 		c.endpoints = newEndpointsController(c, sharedInformers)
@@ -214,9 +221,11 @@ func NewController(client kubernetes.Interface, options Options) *Controller {
 		c.endpoints = newEndpointSliceController(c, sharedInformers)
 	}
 
+	// 注册Nodes Handler
 	c.nodes = sharedInformers.Core().V1().Nodes().Informer()
 	registerHandlers(c.nodes, c.queue, "Nodes", c.onNodeEvent)
 
+	// 注册Pods Handler
 	podInformer := sharedInformers.Core().V1().Pods().Informer()
 	c.pods = newPodCache(podInformer, c)
 	registerHandlers(podInformer, c.queue, "Pods", c.pods.onEvent)
@@ -260,13 +269,16 @@ func (c *Controller) onServiceEvent(curr interface{}, event model.Event) error {
 
 	log.Debugf("Handle event %s for service %s in namespace %s", event, svc.Name, svc.Namespace)
 
+	// 将k8s service转换成istio service
 	svcConv := kube.ConvertService(*svc, c.domainSuffix, c.clusterID)
+	// 根据事件类型处理事件
 	switch event {
-	case model.EventDelete:
+	case model.EventDelete: // 删除事件
 		c.Lock()
 		delete(c.servicesMap, svcConv.Hostname)
 		delete(c.externalNameSvcInstanceMap, svcConv.Hostname)
 		c.Unlock()
+		// 更新服务缓存
 		// EDS needs to just know when service is deleted.
 		c.xdsUpdater.SvcUpdate(c.clusterID, svc.Name, svc.Namespace, event)
 	default:
@@ -280,9 +292,11 @@ func (c *Controller) onServiceEvent(curr interface{}, event model.Event) error {
 			c.externalNameSvcInstanceMap[svcConv.Hostname] = instances
 		}
 		c.Unlock()
+		// 更新服务缓存
 		c.xdsUpdater.SvcUpdate(c.clusterID, svc.Name, svc.Namespace, event)
 	}
 
+	// 触发XDS事件处理器
 	// Notify service handlers.
 	for _, f := range c.serviceHandlers {
 		f(svcConv, event)
@@ -799,6 +813,7 @@ func (c *Controller) updateEDS(ep *v1.Endpoints, event model.Event) {
 	if event != model.EventDelete {
 		for _, ss := range ep.Subsets {
 			for _, ea := range ss.Addresses {
+				// 获取Endpoint对应的Pod实例
 				pod := c.pods.getPodByIP(ea.IP)
 				if pod == nil {
 					// This means, the endpoint event has arrived before pod event. This might happen because
@@ -828,6 +843,7 @@ func (c *Controller) updateEDS(ep *v1.Endpoints, event model.Event) {
 
 				tlsMode := kube.PodTLSMode(pod)
 
+				// 将Endpoint转换成Istio模型IstioEndpoint
 				// EDS and ServiceEntry use name for service port - ADS will need to
 				// map to numbers.
 				for _, port := range ss.Ports {
@@ -850,6 +866,7 @@ func (c *Controller) updateEDS(ep *v1.Endpoints, event model.Event) {
 
 	log.Infof("Handle EDS: %d endpoints for %s in namespace %s", len(endpoints), ep.Name, ep.Namespace)
 
+	// 使用xdsUpdater更新EDS
 	_ = c.xdsUpdater.EDSUpdate(c.clusterID, string(hostname), ep.Namespace, endpoints)
 }
 

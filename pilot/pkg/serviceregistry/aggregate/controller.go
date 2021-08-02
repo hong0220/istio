@@ -310,7 +310,7 @@ func (c *Controller) GetProxyWorkloadLabels(proxy *model.Proxy) (labels.Collecti
 
 // Run starts all the controllers
 func (c *Controller) Run(stop <-chan struct{}) {
-
+	// 遍历GetRegistries列表，并异步执行其Run方法
 	for _, r := range c.GetRegistries() {
 		go r.Run(stop)
 	}

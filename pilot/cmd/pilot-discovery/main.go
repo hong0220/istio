@@ -67,6 +67,8 @@ var (
 			serverArgs.Config.DistributionTrackingEnabled = features.EnableDistributionTracking
 			serverArgs.Config.DistributionCacheRetention = features.DistributionHistoryRetention
 			cmd.PrintFlags(c.Flags())
+
+			// 日志配置
 			if err := log.Configure(loggingOptions); err != nil {
 				return err
 			}
@@ -79,17 +81,20 @@ var (
 			// Create the stop channel for all of the servers.
 			stop := make(chan struct{})
 
+			// 创建xDs服务器：Cluster、Endpoint、Listener、Route等
 			// Create the server for the discovery service.
 			discoveryServer, err := bootstrap.NewServer(&serverArgs)
 			if err != nil {
 				return fmt.Errorf("failed to create discovery service: %v", err)
 			}
 
+			// 启动服务器
 			// Start the server
 			if err := discoveryServer.Start(stop); err != nil {
 				return fmt.Errorf("failed to start discovery service: %v", err)
 			}
 
+			// 等待进程推出
 			cmd.WaitSignal(stop)
 			// Wait until we shut down. In theory this could block forever; in practice we will get
 			// forcibly shut down after 30s in Kubernetes.
