@@ -74,10 +74,13 @@ func NewAgent(proxy Proxy, terminationDrainDuration time.Duration) Agent {
 	return &agent{
 		proxy: proxy,
 		// 用于管理启动Envoy后的状态通道，用于监视Envoy进程的状态
-		statusCh:                 make(chan exitStatus),
-		activeEpochs:             map[int]chan error{},
+		statusCh: make(chan exitStatus),
+		// 活跃的Epoch集合
+		activeEpochs: map[int]chan error{},
+		// 默认5s
 		terminationDrainDuration: terminationDrainDuration,
-		currentEpoch:             -1,
+		// 当前的Epoch
+		currentEpoch: -1,
 	}
 }
 
